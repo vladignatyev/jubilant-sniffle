@@ -12,16 +12,16 @@ Follow these steps to validate the Telegram bot address-checking flow:
 
 3. **Trigger the blockchain selection prompt**
    - Send any alphanumeric string 26–64 characters long to simulate an address (e.g., `1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa`).
-   - The bot should respond with `Which blockchain to check this address across?` and display inline buttons for all supported blockchains.
+   - The bot should respond to the same message with `Which blockchain to check this address across?` and display inline buttons for all supported blockchains.
 
 4. **Immediate response path**
    - Click any blockchain button.
-   - Because the current API stub returns an immediate result for most inputs, the bot should reply to your original address message with `immediate_response`.
+   - The keyboard prompt disappears entirely, and the bot replies to your original address message with `immediate_response`.
 
 5. **Postponed response path**
    - Send another valid-looking address that contains the word `wait` (for example, `waitADDRESS1234567890123456789`).
    - Choose any blockchain option.
-   - The bot will update the prompt that contained the blockchain keyboard to show `Checking the address <address> on blockchain <blockchain>` (with your specific values), then after one polling iteration reply to your address message with `immediate_response`.
+   - The keyboard message is removed, and a new status reply is added to your address message saying `Checking the address <address> on blockchain <blockchain>` (with your specific values). After one polling iteration, the status message disappears and the bot replies to your address message with `immediate_response`.
 
 6. **Parallel request handling**
    - Send two different valid addresses before pressing any blockchain button.

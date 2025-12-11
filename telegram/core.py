@@ -100,16 +100,6 @@ def _reply_target_message_id(callback: CallbackQuery) -> int:
     return callback.message.message_id
 
 
-async def _show_working_status(
-    callback: CallbackQuery, *, address: str, blockchain: str
-) -> None:
-    status_text = f"Checking the address {address} on blockchain {blockchain}"
-    try:
-        await callback.message.edit_text(status_text, reply_markup=None)
-    except Exception:
-        await callback.message.answer(status_text)
-
-
 async def _handle_check_result(
     *,
     callback: CallbackQuery,
@@ -117,10 +107,14 @@ async def _handle_check_result(
     result: CheckAddressResponse,
     address: str,
     blockchain: str,
+    reply_to_message_id: int,
 ) -> None:
-    reply_to_message_id = _reply_target_message_id(callback)
     if isinstance(result, PostponedResponse):
-        await _show_working_status(callback, address=address, blockchain=blockchain)
+        status_message = await callback.message.bot.send_message(
+            callback.message.chat.id,
+            f"Checking the address {address} on blockchain {blockchain}",
+            reply_to_message_id=reply_to_message_id,
+        )
 
         async def _poll() -> None:
             try:
@@ -129,25 +123,32 @@ async def _handle_check_result(
                         result.uid, result.address, result.blockchain
                     )
                     if response:
-                        await callback.message.reply(
+                        await callback.message.bot.send_message(
+                            callback.message.chat.id,
                             response.content,
                             reply_to_message_id=reply_to_message_id,
                         )
                         break
                     await asyncio.sleep(30)
             finally:
+                try:
+                    await status_message.delete()
+                except Exception:
+                    pass
                 _pending_requests.pop(request_id, None)
 
         asyncio.create_task(_poll())
         return
 
     if isinstance(result, ImmediateResponse):
-        await callback.message.reply(
+        await callback.message.bot.send_message(
+            callback.message.chat.id,
             result.content,
             reply_to_message_id=reply_to_message_id,
         )
     else:
-        await callback.message.reply(
+        await callback.message.bot.send_message(
+            callback.message.chat.id,
             str(result),
             reply_to_message_id=reply_to_message_id,
         )
@@ -172,17 +173,22 @@ async def blockchain_selected(callback: CallbackQuery) -> None:
         return
 
     await callback.answer()
-    result = await check_address([address], blockchain)  # type: ignore[arg-type]
+    reply_to_message_id = _reply_target_message_id(callback)
     try:
-        await callback.message.edit_reply_markup(reply_markup=None)
+        await callback.message.delete()
     except Exception:
-        pass
+        try:
+            await callback.message.edit_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+    result = await check_address([address], blockchain)  # type: ignore[arg-type]
     await _handle_check_result(
         callback=callback,
         request_id=request_id,
         result=result,
         address=address,
         blockchain=blockchain,
+        reply_to_message_id=reply_to_message_id,
     )
 
 
