@@ -87,19 +87,40 @@ async def just_address(message: Message) -> None:
     _pending_requests[request_id] = address.strip()
     keyboard = _build_blockchain_keyboard(request_id)
 
-    await message.answer("Which blockchain to check this address across?", reply_markup=keyboard)
+    await message.answer(
+        "Which blockchain to check this address across?",
+        reply_markup=keyboard,
+        reply_to_message_id=message.message_id,
+    )
+
+
+def _reply_target_message_id(callback: CallbackQuery) -> int:
+    if callback.message.reply_to_message:
+        return callback.message.reply_to_message.message_id
+    return callback.message.message_id
+
+
+async def _show_working_status(
+    callback: CallbackQuery, *, address: str, blockchain: str
+) -> None:
+    status_text = f"Checking the address {address} on blockchain {blockchain}"
+    try:
+        await callback.message.edit_text(status_text, reply_markup=None)
+    except Exception:
+        await callback.message.answer(status_text)
 
 
 async def _handle_check_result(
     *,
     callback: CallbackQuery,
     request_id: str,
-    working_message: Message | None,
     result: CheckAddressResponse,
+    address: str,
+    blockchain: str,
 ) -> None:
+    reply_to_message_id = _reply_target_message_id(callback)
     if isinstance(result, PostponedResponse):
-        if not working_message:
-            return
+        await _show_working_status(callback, address=address, blockchain=blockchain)
 
         async def _poll() -> None:
             try:
@@ -108,11 +129,10 @@ async def _handle_check_result(
                         result.uid, result.address, result.blockchain
                     )
                     if response:
-                        try:
-                            await working_message.delete()
-                        except Exception:
-                            pass
-                        await callback.message.answer(response.content)
+                        await callback.message.reply(
+                            response.content,
+                            reply_to_message_id=reply_to_message_id,
+                        )
                         break
                     await asyncio.sleep(30)
             finally:
@@ -121,15 +141,16 @@ async def _handle_check_result(
         asyncio.create_task(_poll())
         return
 
-    if working_message:
-        try:
-            await working_message.delete()
-        except Exception:
-            pass
     if isinstance(result, ImmediateResponse):
-        await callback.message.answer(result.content)
+        await callback.message.reply(
+            result.content,
+            reply_to_message_id=reply_to_message_id,
+        )
     else:
-        await callback.message.answer(str(result))
+        await callback.message.reply(
+            str(result),
+            reply_to_message_id=reply_to_message_id,
+        )
     _pending_requests.pop(request_id, None)
 
 
@@ -152,17 +173,16 @@ async def blockchain_selected(callback: CallbackQuery) -> None:
 
     await callback.answer()
     result = await check_address([address], blockchain)  # type: ignore[arg-type]
-
-    if isinstance(result, PostponedResponse):
-        working_message = await callback.message.answer("Working on your request...")
-    else:
-        working_message = None
-
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
     await _handle_check_result(
         callback=callback,
         request_id=request_id,
-        working_message=working_message,
         result=result,
+        address=address,
+        blockchain=blockchain,
     )
 
 
