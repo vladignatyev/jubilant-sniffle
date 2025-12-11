@@ -34,13 +34,19 @@ Blockchain = Literal[
 
 
 @dataclass(slots=True)
+class ImmediateResponse:
+    content: str
+    detail: str | None = None
+
+
+@dataclass(slots=True)
 class PostponedResponse:
     uid: str
     address: str
     blockchain: Blockchain
 
 
-CheckAddressResponse = Union[str, PostponedResponse]
+CheckAddressResponse = Union[ImmediateResponse, PostponedResponse]
 
 
 async def check_address(addresses: List[str], blockchain: Blockchain) -> CheckAddressResponse:
@@ -58,11 +64,13 @@ async def check_address(addresses: List[str], blockchain: Blockchain) -> CheckAd
             address=primary,
             blockchain=blockchain,
         )
-    return "immediate_response"
+    return ImmediateResponse(content="immediate_response", detail="stub_detail")
 
 
-async def poll_recheck_address(uid: str, address: str, blockchain: Blockchain) -> str | None:
+async def poll_recheck_address(
+    uid: str, address: str, blockchain: Blockchain
+) -> ImmediateResponse | None:
     """Stub poller that pretends to finish processing."""
 
     await asyncio.sleep(0)  # allow context switching
-    return "immediate_response"
+    return ImmediateResponse(content="immediate_response", detail="stub_detail")

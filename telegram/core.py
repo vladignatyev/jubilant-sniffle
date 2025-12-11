@@ -12,7 +12,13 @@ from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
-from telegram.api import CheckAddressResponse, PostponedResponse, check_address, poll_recheck_address
+from telegram.api import (
+    CheckAddressResponse,
+    ImmediateResponse,
+    PostponedResponse,
+    check_address,
+    poll_recheck_address,
+)
 from telegram.config import Settings
 
 
@@ -106,7 +112,7 @@ async def _handle_check_result(
                             await working_message.delete()
                         except Exception:
                             pass
-                        await callback.message.answer(response)
+                        await callback.message.answer(response.content)
                         break
                     await asyncio.sleep(30)
             finally:
@@ -120,7 +126,10 @@ async def _handle_check_result(
             await working_message.delete()
         except Exception:
             pass
-    await callback.message.answer(result)
+    if isinstance(result, ImmediateResponse):
+        await callback.message.answer(result.content)
+    else:
+        await callback.message.answer(str(result))
     _pending_requests.pop(request_id, None)
 
 
